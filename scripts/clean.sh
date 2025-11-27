@@ -8,6 +8,6 @@ TO_REMOVE=(
     # Because we currently have a hard dependency on amdgpu-dkms,
     # we also end up installing that and a bunch of its build dependencies
     # This isn't ideal, but for now just nuke it manually.
-   /boot  /etc/dkms /etc/fonts /usr/src /usr/lib/gcc /var/lib/dkms
+   /boot  /etc/dkms /etc/fonts /usr/src /var/lib/dkms
 )
 rm -rf ${TO_REMOVE[@]}
