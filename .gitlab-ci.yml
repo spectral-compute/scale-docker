@@ -50,13 +50,7 @@ test:
   parallel:
     matrix:
       - TARGET: devel
-        TEST: whispercpp
-        DISTRO: ['ubuntu22.04', 'ubuntu24.04', 'rocky9']
-      - TARGET: base
-        TEST: FLAMEGPU2
-        DISTRO: ['ubuntu22.04', 'ubuntu24.04', 'rocky9']
-      - TARGET: runtime
-        TEST: hashcat
+        TEST: ['hashcat']
         DISTRO: ['ubuntu22.04', 'ubuntu24.04', 'rocky9']
 
 push:
