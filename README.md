@@ -4,6 +4,30 @@ This repo contains the files we use to build SCALE docker/OCI images, for use in
 
 We try our best to imitate the tag layout of NVIDIA's CUDA docker images.
 
+Tags are in the format `$CUDA_VERSION-$TARGET-$DISTRO`, where:
+
+  - Target is one of:
+    - `devel` - which includes the full SCALE developer toolkit
+    - `runtime` - which includes only the parts required for runtime, including maths libraries
+    - `base` - which includes only the minimum runtime
+  - Distro is one of:
+    - `ubuntu22.04`
+  - Cuda version is one of:
+    - `13.0.2`
+
+Each image installs SCALE to `/opt/scale`, as it would be when installing on a host. See [here](https://docs.scale-lang.com/stable/manual/how-to-use/) for how to use SCALE to build/run your programs.
+
+## Building images
+
+To build a particular tag:
+
+```
+# ./scripts/mkImage.sh <cuda version> <distro> <target>
+
+# Example: CUDA 13, with developer tools, for ubuntu22.04
+./scripts/mkImage.sh 13.0.2 ubuntu22.04 devel
+```
+
 ## Running scale-validation with images
 
 For convenience, `./scripts/runValidation.sh` will clone the [scale-validation repo](https://github.com/spectral-compute/scale-validation) and run a test of your choice. You can use this to test that your setup / custom image is running correctly.
