@@ -15,6 +15,24 @@ build-images:
     - shell
   script:
     - ./scripts/buildAll.sh
+    - |-
+        set -e
+        . scripts/supported.sh"
+        DST_REPO=$DOCKER_REGISTRY/$DOCKER_REPO
+        for CUDA_VERSION in ${SUPPORTED_CUDA_VERSIONS[@]}; do
+            echo "- $CUDA_VERSION"
+            for DISTRO in ${SUPPORTED_DISTROS[@]}; do
+                echo "-- $DISTRO"
+                for TARGET in ${SUPPORTED_TARGETS[@]}; do
+                    echo "--- $TARGET"
+                    TAG=$CUDA_VERSION-$TARGET-$DISTRO
+                    docker push $DST_REPO:$TAG
+                    docker push $DST_REPO:$TAG-$SCALE_VERSION
+                done
+            done
+        done
+        docker push $DST_REPO:latest
+        docker push $DST_REPO:latest-$SCALE_VERSION
 
 test:
   extends: .common
