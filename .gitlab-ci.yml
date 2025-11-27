@@ -1,0 +1,77 @@
+---
+stages:
+  - build
+  - test
+  - deploy
+
+.common:
+  variables:
+    PRODUCTION_DOCKER_REGISTRY: quay.io
+
+build-images:
+  extends: .common
+  stage: build
+  tags:
+    - shell
+  script:
+    - ./scripts/buildAll.sh
+
+test:
+  extends: .common
+  stage: prep
+  image: $DOCKER_REGISTRY/spectral-compute/scale-lang:13.0.2-$TARGET-$DISTRO
+  tags:
+    - gpu-tgt:gfx1100
+  variables:
+    ARCH: gfx1100
+  script:
+    - which apt-get && apt-get update && apt-get install -y git
+    - which dnf && dnf install -y git
+    - git clone -b $TAG https://github.com/spectral-compute/scale-validation /scale-validation
+    - /scale-validation/test.sh /workdir /opt/scale $ARCH $TEST
+  parallel:
+    matrix:
+      - TARGET: devel
+        TEST: whispercpp
+        DISTRO: ['ubuntu22.04', 'ubuntu24.04', 'rocky9']
+      - TARGET: base
+        TEST: FLAMEGPU2
+        DISTRO: ['ubuntu22.04', 'ubuntu24.04', 'rocky9']
+      - TARGET: runtime
+        TEST: hashcat
+        DISTRO: ['ubuntu22.04', 'ubuntu24.04', 'rocky9']
+
+push:
+  extends: .common
+  stage: deploy
+  when: manual
+  tags:
+    - shell
+  before_script:
+    - echo "$PRODUCTION_REGISTRY_PASSWORD" | docker login quay.io -u "$PRODUCTION_REGISTRY_USERNAME" --password-stdin
+  script:
+    - |-
+        set -e
+        . scripts/supported.sh"
+        SRC_REPO=$DOCKER_REGISTRY/$DOCKER_REPO
+        DST_REPO=$PRODUCTION_DOCKER_REGISTRY/$DOCKER_REPO
+        for CUDA_VERSION in ${SUPPORTED_CUDA_VERSIONS[@]}; do
+            echo "- $CUDA_VERSION"
+            for DISTRO in ${SUPPORTED_DISTROS[@]}; do
+                echo "-- $DISTRO"
+                for TARGET in ${SUPPORTED_TARGETS[@]}; do
+                    echo "--- $TARGET"
+                    TAG=$CUDA_VERSION-$TARGET-$DISTRO
+                    docker pull $SRC_REPO:$TAG
+                    docker tag $SRC_REPO:$TAG $DST_REPO:$TAG
+                    docker push $DST_REPO:$TAG
+                    docker tag $SRC_REPO:$TAG $DST_REPO:$TAG-$SCALE_VERSION
+                    docker push $DST_REPO:$TAG-$SCALE_VERSION
+                done
+            done
+        done
+        docker pull $SRC_REPO:latest
+        docker tag $SRC_REPO:latest $DST_REPO:latest
+        docker tag $SRC_REPO:latest $DST_REPO:latest-$SCALE_VERSION
+        docker push $DST_REPO:latest
+        docker push $DST_REPO:latest-$SCALE_VERSION
