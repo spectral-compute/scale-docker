@@ -18,7 +18,7 @@ build-images:
 
 test:
   extends: .common
-  stage: prep
+  stage: test
   image: $DOCKER_REGISTRY/spectral-compute/scale-lang:13.0.2-$TARGET-$DISTRO
   tags:
     - gpu-tgt:gfx1100
