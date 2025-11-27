@@ -15,4 +15,4 @@ fi
 
 SCALE_VALIDATION_BRANCH="${SCALE_VALIDATION_BRANCH:-}"
 
-$CONTAINER_COMMAND run -it --rm -e "SCALE_VALIDATION_BRANCH=$SCALE_VALIDATION_BRANCH" -v "$(dirname "$0")/validationEntrypoint.sh:/validationEntrypoint.sh" "$IMAGE" /validationEntrypoint.sh "$@"
+$CONTAINER_COMMAND run -it --rm --device /dev/kfd --device /dev/dri -e "SCALE_VALIDATION_BRANCH=$SCALE_VALIDATION_BRANCH" -v "$(dirname "$0")/validationEntrypoint.sh:/validationEntrypoint.sh" "$IMAGE" /validationEntrypoint.sh "$@"
