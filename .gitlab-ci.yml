@@ -13,6 +13,7 @@ build-images:
   stage: build
   tags:
     - shell
+    - sytronix-cluster
   script:
     - ./scripts/buildAll.sh
     - |-
@@ -59,6 +60,7 @@ push:
   when: manual
   tags:
     - shell
+    - sytronix-cluster
   before_script:
     - echo "$PRODUCTION_REGISTRY_PASSWORD" | docker login quay.io -u "$PRODUCTION_REGISTRY_USERNAME" --password-stdin
   script:
