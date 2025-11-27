@@ -3,7 +3,8 @@ FROM docker.io/ubuntu:22.04 AS devel
 
 LABEL maintainer="Spectral Compute <hello@spectralcompute.co.uk>"
 
-RUN apt-get update && apt-get install -y wget
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y wget git clang gcc make pkg-config cmake libelf-dev
 
 RUN wget https://pkgs.scale-lang.com/deb/dists/jammy/main/binary-all/scale-repos.deb && \
     apt-get install -y ./scale-repos.deb

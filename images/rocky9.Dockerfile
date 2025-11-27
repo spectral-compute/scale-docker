@@ -3,6 +3,7 @@ FROM docker.io/rockylinux/rockylinux:9.6 AS devel
 
 LABEL maintainer="Spectral Compute <hello@spectralcompute.co.uk>"
 
+RUN dnf install -y git which patch gcc clang elfutils-libelf-devel
 RUN dnf install -y https://pkgs.scale-lang.com/rpm/el9/main/scale-repos.rpm
 
 ARG SCALE_VERSION
