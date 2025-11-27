@@ -2,9 +2,14 @@
 
 This repo contains the files we use to build SCALE docker/OCI images, for use in Docker, Kubernetes, or any other environment that can run OCI-compliant containers.
 
-We try our best to imitate the tag layout of NVIDIA's CUDA docker images.
+Each image installs SCALE to `/opt/scale`, as it would be when installing on a host. See [here](https://docs.scale-lang.com/stable/manual/how-to-use/) for how to use SCALE to build/run your programs.
 
-Tags are in the format `$CUDA_VERSION-$TARGET-$DISTRO`, where:
+## Using pre-built images
+
+Pre-built images are hosted on quay.io, you can use the path `quay.io/spectral-compute/scale-lang`.
+
+We try our best to imitate the tag layout of NVIDIA's CUDA docker images.
+Tags are in the format `$CUDA_VERSION-$TARGET-$DISTRO[-$SCALE_VERSION]`, where:
 
   - Target is one of:
     - `devel` - which includes the full SCALE developer toolkit
@@ -12,10 +17,21 @@ Tags are in the format `$CUDA_VERSION-$TARGET-$DISTRO`, where:
     - `base` - which includes only the minimum runtime
   - Distro is one of:
     - `ubuntu22.04`
+    - `ubuntu24.04`
+    - `rocky9`
   - Cuda version is one of:
     - `13.0.2`
+    - `12.1.0`
+    - `11.8.0`
+    - `11.4.3`
+  - If SCALE_VERSION is not specified, default to latest
 
-Each image installs SCALE to `/opt/scale`, as it would be when installing on a host. See [here](https://docs.scale-lang.com/stable/manual/how-to-use/) for how to use SCALE to build/run your programs.
+For convenience, the `latest` tag is equivalent to `13.0.2-devel-ubuntu24.04`.
+
+```
+# Example: Pull the image for building using the latest SCALE, imitating CUDA 13.0.2, on ubuntu22.04
+docker pull quay.io/spectral-compute/scale-lang:13.0.2-devel-ubuntu22.04
+```
 
 ## Building images
 
@@ -27,6 +43,8 @@ To build a particular tag:
 # Example: CUDA 13, with developer tools, for ubuntu22.04
 ./scripts/mkImage.sh 13.0.2 ubuntu22.04 devel
 ```
+
+Images are tagged both qualified and unqualified (ie `quay.io/spectral-compute/scale-lang` and `spectral-compute/scale-lang`). Optionally, you can set the `DOCKER_REPO` environment variable to change what docker registry the image is tagged under. No images are pushed.
 
 ## Running scale-validation with images
 

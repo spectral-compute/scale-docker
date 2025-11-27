@@ -36,17 +36,24 @@ if [[ `contains "$SUPPORTED_TARGETS" $TARGET` != "1" ]]; then
     exit_help
 fi
 
-DOCKER_REGISTRY=docker.io
-DOCKER_REPO=spectral-compute/scale-lang
-DOCKER_TAG="$CUDA_VERSION-$TARGET-$DISTRO"
+DOCKER_TAG_1="$CUDA_VERSION-$TARGET-$DISTRO"
+DOCKER_TAG_2="$CUDA_VERSION-$TARGET-$DISTRO-$SCALE_VERSION"
 
 ARGS=(
     -f "$(dirname "$0")/../images/${DISTRO}.Dockerfile"
-    -t "$DOCKER_REPO:$DOCKER_TAG"
     --build-arg CUDA_VERSION=$CUDA_VERSION
-    -t "$DOCKER_REGISTRY/$DOCKER_REPO:$DOCKER_TAG"
+    --build-arg SCALE_VERSION=$SCALE_VERSION
+    -t "$DOCKER_REPO:$DOCKER_TAG_1"
+    -t "$DOCKER_REGISTRY/$DOCKER_REPO:$DOCKER_TAG_1"
+    -t "$DOCKER_REPO:$DOCKER_TAG_2"
+    -t "$DOCKER_REGISTRY/$DOCKER_REPO:$DOCKER_TAG_2"
     --target "${TARGET}"
 )
+
+if [ "$CUDA_VERSION" == "13.0.2" ] && [ "$DISTRO" == "ubuntu24.04" ] && [ "$TARGET" == "devel" ]; then
+    ARGS+=(-t "$DOCKER_REPO:latest" -t "$DOCKER_REGISTRY/$DOCKER_REPO:latest")
+fi
+
 docker build \
     ${ARGS[@]} \
     "$(dirname "$0")/.."

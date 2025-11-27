@@ -1,16 +1,12 @@
 # devel - full scale toolkit
-FROM docker.io/ubuntu:22.04 AS devel
+FROM docker.io/rockylinux/rockylinux:9.6 AS devel
 
 LABEL maintainer="Spectral Compute <hello@spectralcompute.co.uk>"
 
-RUN apt-get update && apt-get install -y wget
-
-RUN wget https://pkgs.scale-lang.com/deb/dists/jammy/main/binary-all/scale-repos.deb && \
-    apt-get install -y ./scale-repos.deb
+RUN dnf install -y https://pkgs.scale-lang.com/rpm/el9/main/scale-repos.rpm
 
 ARG SCALE_VERSION
-RUN apt-get update && \
-    SCALE_LICENSE_ACCEPT=1 apt-get install --no-install-recommends -y scale=$SCALE_VERSION
+RUN SCALE_LICENSE_ACCEPT=1 dnf install -y scale-$SCALE_VERSION
 
 ARG CUDA_VERSION
 ENV SCALE_CUDA_VERSION=$CUDA_VERSION

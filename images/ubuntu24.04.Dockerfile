@@ -1,11 +1,11 @@
 # devel - full scale toolkit
-FROM docker.io/ubuntu:22.04 AS devel
+FROM docker.io/ubuntu:24.04 AS devel
 
 LABEL maintainer="Spectral Compute <hello@spectralcompute.co.uk>"
 
 RUN apt-get update && apt-get install -y wget
 
-RUN wget https://pkgs.scale-lang.com/deb/dists/jammy/main/binary-all/scale-repos.deb && \
+RUN wget https://pkgs.scale-lang.com/deb/dists/noble/main/binary-all/scale-repos.deb && \
     apt-get install -y ./scale-repos.deb
 
 ARG SCALE_VERSION
