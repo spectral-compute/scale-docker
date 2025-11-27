@@ -18,7 +18,11 @@ SKIP_N="${3:-}"
 STOP_AFTER_N="${4:-}"
 
 if ! which git >/dev/null; then
-    apt-get update && apt-get install -y git
+    if which apt-get >/dev/null; then
+        apt-get update && apt-get install -y git
+    else
+        dnf install -y git
+    fi
 fi
 
 git clone -b $TAG https://github.com/spectral-compute/scale-validation /scale-validation
