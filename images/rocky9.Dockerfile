@@ -14,6 +14,9 @@ ENV SCALE_CUDA_VERSION=$CUDA_VERSION
 
 RUN --mount=type=bind,src=scripts/clean.sh,target=/clean.sh /clean.sh
 
+ADD scripts/entrypoint.sh /entrypoint
+ENTRYPOINT /entrypoint
+
 # runtime - required bits for runtime, plus math libraries and NCCL
 FROM devel AS runtime
 

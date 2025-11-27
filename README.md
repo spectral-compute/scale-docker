@@ -62,3 +62,5 @@ Optionally, you can set the `SCALE_VALIDATION_BRANCH` environment variable to us
 ## Running images
 
 In order to share the host's GPU with the container, you must mount the `/dev/kfd` and `/dev/dri` directories. Using the docker CLI, this is done by adding `--device /dev/kfd --device /dev/dri`. The `--gpus` flag is insufficient for AMD cards.
+
+You will also need to indicate that you've read and accepted the SCALE EULA in order to use these images, which you can do by setting the `SCALE_LICENSE_ACCEPT` environment variable to 1. Using the docker CLI, this is done by adding `-e SCALE_LICENSE_ACCEPT=1`.
