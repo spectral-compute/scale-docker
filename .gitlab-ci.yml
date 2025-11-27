@@ -17,7 +17,7 @@ build-images:
     - ./scripts/buildAll.sh
     - |-
         set -e
-        . scripts/supported.sh"
+        . "scripts/supported.sh"
         DST_REPO=$DOCKER_REGISTRY/$DOCKER_REPO
         for CUDA_VERSION in ${SUPPORTED_CUDA_VERSIONS[@]}; do
             echo "- $CUDA_VERSION"
@@ -64,7 +64,7 @@ push:
   script:
     - |-
         set -e
-        . scripts/supported.sh"
+        . "scripts/supported.sh"
         SRC_REPO=$DOCKER_REGISTRY/$DOCKER_REPO
         DST_REPO=$PRODUCTION_DOCKER_REGISTRY/$DOCKER_REPO
         for CUDA_VERSION in ${SUPPORTED_CUDA_VERSIONS[@]}; do
