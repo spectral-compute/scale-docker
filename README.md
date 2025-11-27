@@ -16,9 +16,9 @@ Tags are in the format `$CUDA_VERSION-$TARGET-$DISTRO[-$SCALE_VERSION]`, where:
     - `runtime` - which includes only the parts required for runtime, including maths libraries
     - `base` - which includes only the minimum runtime
   - Distro is one of:
-    - `ubuntu22.04`
-    - `ubuntu24.04`
-    - `rocky9`
+    - `ubuntu22.04`, based off of `docker.io/ubuntu:22.04`
+    - `ubuntu24.04`, based off of `docker.io/ubuntu:24.04`
+    - `rocky9`, based off of `docker.io/rockylinux/rockylinux:9`
   - Cuda version is one of:
     - `13.0.2`
     - `12.1.0`
@@ -58,3 +58,7 @@ For convenience, `./scripts/runValidation.sh` will clone the [scale-validation r
 ```
 
 Optionally, you can set the `SCALE_VALIDATION_BRANCH` environment variable to use a different branch/tag.
+
+## Running images
+
+In order to share the host's GPU with the container, you must mount the `/dev/kfd` and `/dev/dri` directories. Using the docker CLI, this is done by adding `--device /dev/kfd --device /dev/dri`. The `--gpus` flag is insufficient for AMD cards.
