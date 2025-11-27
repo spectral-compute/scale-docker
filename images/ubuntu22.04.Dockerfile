@@ -1,9 +1,6 @@
 # devel - full scale toolkit
 FROM ubuntu:22.04 AS devel
 
-ARG CUDA_VERSION
-ENV SCALE_CUDA_VERSION=$CUDA_VERSION
-
 LABEL maintainer="Spectral Compute <hello@spectralcompute.co.uk>"
 
 RUN apt-get update && apt-get install -y wget
@@ -12,7 +9,10 @@ RUN wget https://pkgs.scale-lang.com/deb/dists/jammy/main/binary-all/scale-repos
     apt-get install -y ./scale-repos.deb
 
 RUN apt-get update && \
-    SCALE_LICENSE_ACCEPT=1 apt-get install -y scale
+    SCALE_LICENSE_ACCEPT=1 apt-get install --no-install-recommends -y scale
+
+ARG CUDA_VERSION
+ENV SCALE_CUDA_VERSION=$CUDA_VERSION
 
 RUN --mount=type=bind,src=scripts/clean.sh,target=/clean.sh /clean.sh
 
