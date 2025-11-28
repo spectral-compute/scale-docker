@@ -43,6 +43,7 @@ test:
     - gpu-tgt:gfx1100
   variables:
     ARCH: gfx1100
+    SCALE_LICENSE_ACCEPT: 1
   script:
     - which apt-get && apt-get update && apt-get install -y git
     - which dnf && dnf install -y git
