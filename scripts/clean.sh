@@ -11,3 +11,10 @@ TO_REMOVE=(
    /boot  /etc/dkms /etc/fonts /usr/src /var/lib/dkms
 )
 rm -rf ${TO_REMOVE[@]}
+
+# HACK: This sucks, but for now is the only way to run our images in gitlab CI for testing.
+# If you're reading this because you're confused what these random files are, sorry.
+echo "" > /usr/bin/preBuild.sh
+chmod +x /usr/bin/preBuild.sh
+echo "" > /usr/bin/postBuild.sh
+chmod +x /usr/bin/postBuild.sh
