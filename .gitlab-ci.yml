@@ -48,7 +48,7 @@ test:
   script:
     - which apt-get && apt-get update && apt-get install -y git
     - which dnf && dnf install -y git
-    - git clone -b $TAG https://github.com/spectral-compute/scale-validation /scale-validation
+    - git clone -b release https://github.com/spectral-compute/scale-validation /scale-validation
     - /scale-validation/test.sh /workdir /opt/scale $ARCH $TEST
   parallel:
     matrix:
