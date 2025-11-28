@@ -6,7 +6,7 @@ Each image installs SCALE to `/opt/scale`, as it would be when installing on a h
 
 ## Using pre-built images
 
-Pre-built images are hosted on quay.io, you can use the path `quay.io/spectral-compute/scale-lang`.
+Pre-built images are hosted on quay.io, you can use the path `quay.io/spectral-compute/scale`.
 
 We try our best to imitate the tag layout of NVIDIA's CUDA docker images.
 Tags are in the format `$CUDA_VERSION-$TARGET-$DISTRO[-$SCALE_VERSION]`, where:
@@ -30,7 +30,7 @@ For convenience, the `latest` tag is equivalent to `13.0.2-devel-ubuntu24.04`.
 
 ```
 # Example: Pull the image for building using the latest SCALE, imitating CUDA 13.0.2, on ubuntu22.04
-docker pull quay.io/spectral-compute/scale-lang:13.0.2-devel-ubuntu22.04
+docker pull quay.io/spectral-compute/scale:13.0.2-devel-ubuntu22.04
 ```
 
 ## Building images
@@ -44,7 +44,7 @@ To build a particular tag:
 ./scripts/mkImage.sh 13.0.2 ubuntu22.04 devel
 ```
 
-Images are tagged both qualified and unqualified (ie `quay.io/spectral-compute/scale-lang` and `spectral-compute/scale-lang`). Optionally, you can set the `DOCKER_REPO` environment variable to change what docker registry the image is tagged under. No images are pushed.
+Images are tagged both qualified and unqualified (ie `quay.io/spectral-compute/scale` and `spectral-compute/scale`). Optionally, you can set the `DOCKER_REPO` environment variable to change what docker registry the image is tagged under. No images are pushed.
 
 ## Running scale-validation with images
 
@@ -54,7 +54,7 @@ For convenience, `./scripts/runValidation.sh` will clone the [scale-validation r
 # ./scripts/runValidation.sh <image> <gpu isa> <test>
 
 # Example: gfx1100 on hashcat
-./scripts/runValidation.sh spectral-compute/scale-lang:13.0.2-devel-ubuntu22.04 gfx1100 hashcat
+./scripts/runValidation.sh spectral-compute/scale:13.0.2-devel-ubuntu22.04 gfx1100 hashcat
 ```
 
 Optionally, you can set the `SCALE_VALIDATION_BRANCH` environment variable to use a different branch/tag.
