@@ -41,6 +41,7 @@ test:
   image: $DOCKER_REGISTRY/spectral-compute/scale-lang:13.0.2-$TARGET-$DISTRO
   tags:
     - gpu-tgt:gfx1100
+    - sytronix-cluster
   variables:
     ARCH: gfx1100
     SCALE_LICENSE_ACCEPT: 1
