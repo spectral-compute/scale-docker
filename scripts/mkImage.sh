@@ -52,6 +52,7 @@ ARGS=(
 
 if [ "$CUDA_VERSION" == "13.0.2" ] && [ "$DISTRO" == "ubuntu24.04" ] && [ "$TARGET" == "devel" ]; then
     ARGS+=(-t "$DOCKER_REPO:latest" -t "$DOCKER_REGISTRY/$DOCKER_REPO:latest")
+    ARGS+=(-t "$DOCKER_REPO:latest-$SCALE_VERSION" -t "$DOCKER_REGISTRY/$DOCKER_REPO:latest-$SCALE_VERSION")
 fi
 
 docker build \
