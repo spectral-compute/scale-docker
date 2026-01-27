@@ -7,6 +7,7 @@ stages:
 .common:
   variables:
     PRODUCTION_DOCKER_REGISTRY: quay.io
+    PRODUCTION_DOCKER_REGISTRY2: docker.io
 
 build-images:
   extends: .common
@@ -65,12 +66,14 @@ push:
     - sytronix-cluster
   before_script:
     - echo "$PRODUCTION_REGISTRY_PASSWORD" | docker login quay.io -u "$PRODUCTION_REGISTRY_USERNAME" --password-stdin
+    - echo "$PRODUCTION_REGISTRY2_PASSWORD" | docker login docker.io -u "$PRODUCTION_REGISTRY2_USERNAME" --password-stdin
   script:
     - |-
         set -e
         . "scripts/supported.sh"
         SRC_REPO=$DOCKER_REGISTRY/$DOCKER_REPO
         DST_REPO=$PRODUCTION_DOCKER_REGISTRY/$DOCKER_REPO
+        DST_REPO2=$PRODUCTION_DOCKER_REGISTRY2/$DOCKER_REPO2
         for CUDA_VERSION in ${SUPPORTED_CUDA_VERSIONS[@]}; do
             echo "- $CUDA_VERSION"
             for DISTRO in ${SUPPORTED_DISTROS[@]}; do
@@ -80,14 +83,22 @@ push:
                     TAG=$CUDA_VERSION-$TARGET-$DISTRO
                     docker pull $SRC_REPO:$TAG
                     docker tag $SRC_REPO:$TAG $DST_REPO:$TAG
-                    docker push $DST_REPO:$TAG
+                    docker tag $SRC_REPO:$TAG $DST_REPO2:$TAG
                     docker tag $SRC_REPO:$TAG $DST_REPO:$TAG-$SCALE_VERSION
+                    docker tag $SRC_REPO:$TAG $DST_REPO2:$TAG-$SCALE_VERSION
+                    docker push $DST_REPO:$TAG
                     docker push $DST_REPO:$TAG-$SCALE_VERSION
+                    docker push $DST_REPO2:$TAG
+                    docker push $DST_REPO2:$TAG-$SCALE_VERSION
                 done
             done
         done
         docker pull $SRC_REPO:latest
         docker tag $SRC_REPO:latest $DST_REPO:latest
         docker tag $SRC_REPO:latest $DST_REPO:latest-$SCALE_VERSION
+        docker tag $SRC_REPO:latest $DST_REPO2:latest
+        docker tag $SRC_REPO:latest $DST_REPO2:latest-$SCALE_VERSION
         docker push $DST_REPO:latest
         docker push $DST_REPO:latest-$SCALE_VERSION
+        docker push $DST_REPO2:latest
+        docker push $DST_REPO2:latest-$SCALE_VERSION
