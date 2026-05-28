@@ -1,0 +1,163 @@
+on:
+  workflow_dispatch:
+    inputs: deploy
+      default: false
+      type: boolean
+
+env:
+  DOCKER_REGISTRY: "${{ vars.DOCKER_REGISTRY }}"
+  PRODUCTION_DOCKER_REGISTRY: quay.io
+  PRODUCTION_DOCKER_REGISTRY2: docker.io
+
+jobs:
+  build-images:
+    runs-on: docker-builder
+    steps:
+      - name: Checkout and setup
+        uses: ${{ forgejo.server_url }}/spectral-compute/ci-helpers/setup@master
+        with:
+          token: '${{ secrets.CI_CLONE_TOKEN }}'
+          private-key: '${{ secrets.CI_BOT_USER_PRIVATE_KEY }}'
+          netrc: '${{ secrets.CI_NETRC }}'
+
+      - name: Install docker CLI
+        run: |
+          set -eo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+          sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+          Types: deb
+          URIs: https://download.docker.com/linux/ubuntu
+          Suites: $(. /etc/os-release && echo "${DEBIAN_CODENAME:-$VERSION_CODENAME}")
+          Components: stable
+          Signed-By: /etc/apt/keyrings/docker.asc
+          EOF
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin
+
+      - name: Build images
+        run: sudo -E ./scripts/buildAll.sh
+      - name: Push to internal registry
+        run: |
+          set -e
+          . "scripts/supported.sh"
+          DST_REPO=$DOCKER_REGISTRY/$DOCKER_REPO
+          for CUDA_VERSION in ${SUPPORTED_CUDA_VERSIONS[@]}; do
+              echo "- $CUDA_VERSION"
+              for DISTRO in ${SUPPORTED_DISTROS[@]}; do
+                  echo "-- $DISTRO"
+                  for TARGET in ${SUPPORTED_TARGETS[@]}; do
+                      echo "--- $TARGET"
+                      TAG=$CUDA_VERSION-$TARGET-$DISTRO
+                      sudo -E docker push $DST_REPO:$TAG
+                      sudo -E docker push $DST_REPO:$TAG-$SCALE_VERSION
+                  done
+              done
+          done
+          sudo -E docker push $DST_REPO:latest
+          sudo -E docker push $DST_REPO:latest-$SCALE_VERSION
+
+  test:
+    name: 'test-${{ matrix.target }}-${{ matrix.distro }}'
+    runs-on: gfx1100
+    needs: build-images
+    env:
+      ARCH: gfx1100
+      SCALE_LICENSE_ACCEPT: 1
+    strategy:
+      matrix:
+        target: 'devel'
+        test: ['hashcat']
+        distro: ['ubuntu22.04', 'ubuntu24.04', 'rocky9']
+    container:
+      image: ${{ vars.DOCKER_REGISTRY }}/spectral-compute/scale-lang:13.0.2-${{ matrix.target }}-${{ matrix.distro }}
+    steps:
+      - name: Checkout and setup
+        uses: ${{ forgejo.server_url }}/spectral-compute/ci-helpers/setup@master
+        with:
+          token: '${{ secrets.CI_CLONE_TOKEN }}'
+          private-key: '${{ secrets.CI_BOT_USER_PRIVATE_KEY }}'
+          netrc: '${{ secrets.CI_NETRC }}'
+
+      - name: Run tests
+        run: |
+          which apt-get && apt-get update && apt-get install -y git
+          which dnf && dnf install -y git
+          git clone -b release https://github.com/spectral-compute/scale-validation /scale-validation
+          /scale-validation/test.sh /workdir /opt/scale $ARCH ${{ matrix.test }}
+
+  deploy:
+    runs-on: docker-builder
+    needs: test
+    if: ${{ inputs.deploy }}
+    steps:
+      - name: Checkout and setup
+        uses: ${{ forgejo.server_url }}/spectral-compute/ci-helpers/setup@master
+        with:
+          token: '${{ secrets.CI_CLONE_TOKEN }}'
+          private-key: '${{ secrets.CI_BOT_USER_PRIVATE_KEY }}'
+          netrc: '${{ secrets.CI_NETRC }}'
+
+      - name: Install docker CLI
+        run: |
+          set -eo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+          sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+          Types: deb
+          URIs: https://download.docker.com/linux/ubuntu
+          Suites: $(. /etc/os-release && echo "${DEBIAN_CODENAME:-$VERSION_CODENAME}")
+          Components: stable
+          Signed-By: /etc/apt/keyrings/docker.asc
+          EOF
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin
+
+      - name: Log in to production registries
+        run: |
+          echo '${{ secrets.PRODUCTION_REGISTRY_PASSWORD }}' | sudo -E docker login quay.io -u '${{ secrets.PRODUCTION_REGISTRY_USERNAME }}' --password-stdin
+          echo '${{ secrets.PRODUCTION_REGISTRY2_PASSWORD }}' | sudo -E docker login docker.io -u '${{ secrets.PRODUCTION_REGISTRY2_USERNAME }}' --password-stdin
+
+      - name: Push to production registries
+        run: |
+          set -e
+          . "scripts/supported.sh"
+          SRC_REPO=$DOCKER_REGISTRY/$DOCKER_REPO
+          DST_REPO=$PRODUCTION_DOCKER_REGISTRY/$DOCKER_REPO
+          DST_REPO2=$PRODUCTION_DOCKER_REGISTRY2/$DOCKER_REPO2
+          for CUDA_VERSION in ${SUPPORTED_CUDA_VERSIONS[@]}; do
+              echo "- $CUDA_VERSION"
+              for DISTRO in ${SUPPORTED_DISTROS[@]}; do
+                  echo "-- $DISTRO"
+                  for TARGET in ${SUPPORTED_TARGETS[@]}; do
+                      echo "--- $TARGET"
+                      TAG=$CUDA_VERSION-$TARGET-$DISTRO
+                      sudo -E docker pull $SRC_REPO:$TAG
+                      sudo -E docker tag $SRC_REPO:$TAG $DST_REPO:$TAG
+                      sudo -E docker tag $SRC_REPO:$TAG $DST_REPO2:$TAG
+                      sudo -E docker tag $SRC_REPO:$TAG $DST_REPO:$TAG-$SCALE_VERSION
+                      sudo -E docker tag $SRC_REPO:$TAG $DST_REPO2:$TAG-$SCALE_VERSION
+                      sudo -E docker push $DST_REPO:$TAG
+                      sudo -E docker push $DST_REPO:$TAG-$SCALE_VERSION
+                      sudo -E docker push $DST_REPO2:$TAG
+                      sudo -E docker push $DST_REPO2:$TAG-$SCALE_VERSION
+                  done
+              done
+          done
+          sudo -E docker pull $SRC_REPO:latest
+          sudo -E docker tag $SRC_REPO:latest $DST_REPO:latest
+          sudo -E docker tag $SRC_REPO:latest $DST_REPO:latest-$SCALE_VERSION
+          sudo -E docker tag $SRC_REPO:latest $DST_REPO2:latest
+          sudo -E docker tag $SRC_REPO:latest $DST_REPO2:latest-$SCALE_VERSION
+          sudo -E docker push $DST_REPO:latest
+          sudo -E docker push $DST_REPO:latest-$SCALE_VERSION
+          sudo -E docker push $DST_REPO2:latest
+          sudo -E docker push $DST_REPO2:latest-$SCALE_VERSION
