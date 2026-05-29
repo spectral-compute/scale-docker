@@ -1,8 +1,9 @@
 on:
   workflow_dispatch:
-    inputs: deploy
-      default: false
-      type: boolean
+    inputs:
+      deploy:
+        default: false
+        type: boolean
 
 env:
   DOCKER_REGISTRY: "${{ vars.DOCKER_REGISTRY }}"
