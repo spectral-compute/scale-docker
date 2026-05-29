@@ -66,16 +66,16 @@ jobs:
     name: 'test-${{ matrix.target }}-${{ matrix.distro }}'
     runs-on: gfx1100
     needs: build-images
-    env:
-      ARCH: gfx1100
-      SCALE_LICENSE_ACCEPT: 1
     strategy:
       matrix:
-        target: 'devel'
+        target: ['devel']
         test: ['hashcat']
         distro: ['ubuntu22.04', 'ubuntu24.04', 'rocky9']
     container:
       image: ${{ vars.DOCKER_REGISTRY }}/spectral-compute/scale-lang:13.0.2-${{ matrix.target }}-${{ matrix.distro }}
+      env:
+        ARCH: gfx1100
+        SCALE_LICENSE_ACCEPT: 1
     steps:
       - name: Checkout and setup
         uses: ${{ forgejo.server_url }}/spectral-compute/ci-helpers/setup@master
