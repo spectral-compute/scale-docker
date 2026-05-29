@@ -77,13 +77,6 @@ jobs:
         ARCH: gfx1100
         SCALE_LICENSE_ACCEPT: 1
     steps:
-      - name: Checkout and setup
-        uses: ${{ forgejo.server_url }}/spectral-compute/ci-helpers/setup@master
-        with:
-          token: '${{ secrets.CI_CLONE_TOKEN }}'
-          private-key: '${{ secrets.CI_BOT_USER_PRIVATE_KEY }}'
-          netrc: '${{ secrets.CI_NETRC }}'
-
       - name: Run tests
         run: |
           which apt-get && apt-get update && apt-get install -y git
