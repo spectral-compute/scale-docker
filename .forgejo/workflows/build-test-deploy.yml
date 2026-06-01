@@ -87,9 +87,13 @@ jobs:
           /scale-validation/test.sh /workdir /opt/scale $ARCH ${{ matrix.test }}
 
   deploy:
+    name: 'deploy-${{ matrix.destination }}'
     runs-on: docker-builder
     needs: test
     if: ${{ inputs.deploy || forgejo.ref == 'refs/heads/main' }}
+    strategy:
+      matrix:
+        destination: ['quay', 'docker']
     steps:
       - name: Checkout and setup
         uses: ${{ forgejo.server_url }}/spectral-compute/ci-helpers/setup@master
@@ -117,18 +121,30 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin
 
-      - name: Log in to production registries
+      - name: Log in to production registry
         run: |
-          echo '${{ secrets.PRODUCTION_REGISTRY_PASSWORD }}' | sudo -E docker login quay.io -u '${{ secrets.PRODUCTION_REGISTRY_USERNAME }}' --password-stdin
-          echo '${{ secrets.PRODUCTION_REGISTRY2_PASSWORD }}' | sudo -E docker login docker.io -u '${{ secrets.PRODUCTION_REGISTRY2_USERNAME }}' --password-stdin
+          case ${{ matrix.destination }} in
+            quay)
+              echo '${{ secrets.PRODUCTION_REGISTRY_PASSWORD }}' | sudo -E docker login quay.io -u '${{ secrets.PRODUCTION_REGISTRY_USERNAME }}' --password-stdin
+              ;;
+            docker)
+              echo '${{ secrets.PRODUCTION_REGISTRY2_PASSWORD }}' | sudo -E docker login docker.io -u '${{ secrets.PRODUCTION_REGISTRY2_USERNAME }}' --password-stdin
+              ;;
+          esac
 
-      - name: Push to production registries
+      - name: Push to production registry
         run: |
           set -e
           . "scripts/supported.sh"
           SRC_REPO=$DOCKER_REGISTRY/$DOCKER_REPO
-          DST_REPO=$PRODUCTION_DOCKER_REGISTRY/$DOCKER_REPO
-          DST_REPO2=$PRODUCTION_DOCKER_REGISTRY2/$DOCKER_REPO2
+          case ${{ matrix.destination }} in
+            quay)
+              DST_REPO=$PRODUCTION_DOCKER_REGISTRY/$DOCKER_REPO
+              ;;
+            docker)
+              DST_REPO=$PRODUCTION_DOCKER_REGISTRY2/$DOCKER_REPO2
+              ;;
+          esac
           for CUDA_VERSION in ${SUPPORTED_CUDA_VERSIONS[@]}; do
               echo "- $CUDA_VERSION"
               for DISTRO in ${SUPPORTED_DISTROS[@]}; do
@@ -138,22 +154,14 @@ jobs:
                       TAG=$CUDA_VERSION-$TARGET-$DISTRO
                       sudo -E docker pull $SRC_REPO:$TAG
                       sudo -E docker tag $SRC_REPO:$TAG $DST_REPO:$TAG
-                      sudo -E docker tag $SRC_REPO:$TAG $DST_REPO2:$TAG
                       sudo -E docker tag $SRC_REPO:$TAG $DST_REPO:$TAG-$SCALE_VERSION
-                      sudo -E docker tag $SRC_REPO:$TAG $DST_REPO2:$TAG-$SCALE_VERSION
                       sudo -E docker push $DST_REPO:$TAG
                       sudo -E docker push $DST_REPO:$TAG-$SCALE_VERSION
-                      sudo -E docker push $DST_REPO2:$TAG
-                      sudo -E docker push $DST_REPO2:$TAG-$SCALE_VERSION
                   done
               done
           done
           sudo -E docker pull $SRC_REPO:latest
           sudo -E docker tag $SRC_REPO:latest $DST_REPO:latest
           sudo -E docker tag $SRC_REPO:latest $DST_REPO:latest-$SCALE_VERSION
-          sudo -E docker tag $SRC_REPO:latest $DST_REPO2:latest
-          sudo -E docker tag $SRC_REPO:latest $DST_REPO2:latest-$SCALE_VERSION
           sudo -E docker push $DST_REPO:latest
           sudo -E docker push $DST_REPO:latest-$SCALE_VERSION
-          sudo -E docker push $DST_REPO2:latest
-          sudo -E docker push $DST_REPO2:latest-$SCALE_VERSION
