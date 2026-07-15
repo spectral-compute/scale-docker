@@ -1,0 +1,88 @@
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Commit sha of the scale extended-tests.yml nightly run to build from'
+        required: true
+        type: 'string'
+      distros:
+        description: 'Distros to build nightly base images for (JSON array). Each needs images/nightly/<distro>.Dockerfile.'
+        default: '["ubuntu24.04"]'
+        type: 'string'
+      cuda_version:
+        description: 'CUDA_VERSION build-arg (informational only; does not affect the SCALE install)'
+        default: '13.0.2'
+        type: 'string'
+
+env:
+  DOCKER_REGISTRY: "${{ vars.DOCKER_REGISTRY }}"
+
+jobs:
+  build-nightly-base:
+    name: 'build-nightly-base-${{ matrix.distro }}'
+    runs-on: docker-builder
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: ${{ fromJSON(inputs.distros) }}
+    steps:
+      - name: Checkout and setup
+        uses: ${{ forgejo.server_url }}/spectral-compute/ci-helpers/setup@master
+        with:
+          token: '${{ secrets.CI_CLONE_TOKEN }}'
+          private-key: '${{ secrets.CI_BOT_USER_PRIVATE_KEY }}'
+          netrc: '${{ secrets.CI_NETRC }}'
+          submodules: 'ci/common'
+
+      - name: Install docker CLI
+        run: |
+          set -eo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+          sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+          Types: deb
+          URIs: https://download.docker.com/linux/ubuntu
+          Suites: $(. /etc/os-release && echo "${DEBIAN_CODENAME:-$VERSION_CODENAME}")
+          Components: stable
+          Signed-By: /etc/apt/keyrings/docker.asc
+          EOF
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin
+
+      - name: Download nightly package
+        # Called by relative path, not bare `artefacts`: this job has no
+        # `container:` image baking ci-helpers onto $PATH.
+        run: ci/common/bin/artefacts pull "packages/nightlies/$SHA/$DISTRO/" ./nightly-deb/
+        env:
+          SHA: ${{ inputs.sha }}
+          DISTRO: ${{ matrix.distro }}
+
+      - name: Stage the .deb at a fixed path
+        run: |
+          set -e
+          PACKAGE_FILE=$(find ./nightly-deb -type f -regex '.*\.deb$' | head -n1)
+          [ -n "$PACKAGE_FILE" ] || { echo "No .deb found under packages/nightlies/$SHA/$DISTRO/" >&2; exit 1; }
+          cp "$PACKAGE_FILE" ./nightly-deb/scale-nightly.deb
+        env:
+          SHA: ${{ inputs.sha }}
+          DISTRO: ${{ matrix.distro }}
+
+      - name: Build and push nightly base image
+        run: |
+          set -e
+          TAG="$DOCKER_REGISTRY/spectral-compute/scale:$DISTRO-devel-nightly-$SHA"
+          ALIAS_TAG="$DOCKER_REGISTRY/spectral-compute/scale:$DISTRO-devel-nightly"
+          sudo -E docker build --target devel \
+              --build-arg CUDA_VERSION="$CUDA_VERSION" \
+              -f "images/nightly/$DISTRO.Dockerfile" \
+              -t "$TAG" -t "$ALIAS_TAG" .
+          sudo -E docker push "$TAG"
+          sudo -E docker push "$ALIAS_TAG"
+        env:
+          SHA: ${{ inputs.sha }}
+          DISTRO: ${{ matrix.distro }}
+          CUDA_VERSION: ${{ inputs.cuda_version }}
