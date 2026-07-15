@@ -1,0 +1,214 @@
+on:
+  workflow_dispatch:
+    inputs:
+      projects:
+        description: 'App-hub projects to build (JSON array, names match scale-validation/ subdirs)'
+        type: 'string'
+        default: |-
+          [
+            "caffe",
+            "cycles",
+            "hashcat",
+            "nvflip",
+            "whispercpp"
+          ]
+      gfx:
+        description: 'Override the GPUs to build/test on (JSON array). Defaults to the same var extended-tests.yml uses.'
+        required: false
+        # default: '${{ vars.SCALE_GPUS_TO_EXTENDED_TEST || vars.SCALE_GPUS_TO_TEST }}'
+        type: 'string'
+      deploy:
+        description: >-
+          Push tested images to the public registries (quay.io/docker.io). This is the
+          only thing that gates a public push - passing tests alone are not enough (see
+          `needs: test` on the deploy job below). Nightly dispatches must always pass
+          deploy=false and stay internal-only; promoting to public is a deliberate,
+          separate dispatch with deploy=true, mirroring how package releases are
+          published today (a manual, GPG-signed step - see package/HOWTO.md upstream -
+          not an automatic trigger on any git ref/tag).
+        default: false
+        type: 'boolean'
+      scale_base_image:
+        description: 'Override SCALE_BASE_IMAGE build-arg (e.g. a nightly base image tag). Empty means use each Dockerfile default.'
+        default: ''
+        type: 'string'
+      scale_validation_ref:
+        description: 'scale-validation ref/branch to build Dockerfiles from'
+        default: 'release'
+        type: 'string'
+
+env:
+  DOCKER_REGISTRY: "${{ vars.DOCKER_REGISTRY }}"
+  PRODUCTION_DOCKER_REGISTRY: quay.io
+  PRODUCTION_DOCKER_REGISTRY2: docker.io
+
+jobs:
+  build-images:
+    name: 'build-${{ matrix.project }}-${{ matrix.gfx }}'
+    runs-on: docker-builder
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJSON(inputs.projects) }}
+        gfx: ${{ fromJSON(inputs.gfx || vars.SCALE_GPUS_TO_EXTENDED_TEST || vars.SCALE_GPUS_TO_TEST) }}
+    steps:
+      - name: Checkout and setup
+        uses: ${{ forgejo.server_url }}/spectral-compute/ci-helpers/setup@master
+        with:
+          token: '${{ secrets.CI_CLONE_TOKEN }}'
+          private-key: '${{ secrets.CI_BOT_USER_PRIVATE_KEY }}'
+          netrc: '${{ secrets.CI_NETRC }}'
+
+      - name: Install docker CLI
+        run: |
+          set -eo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+          sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+          Types: deb
+          URIs: https://download.docker.com/linux/ubuntu
+          Suites: $(. /etc/os-release && echo "${DEBIAN_CODENAME:-$VERSION_CODENAME}")
+          Components: stable
+          Signed-By: /etc/apt/keyrings/docker.asc
+          EOF
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin
+
+      - name: Clone scale-validation
+        run: git clone -b "$SCALE_VALIDATION_REF" https://github.com/spectral-compute/scale-validation scale-validation
+        env:
+          SCALE_VALIDATION_REF: ${{ inputs.scale_validation_ref }}
+
+      - name: Build and push images
+        run: |
+          set -e
+          . scripts/apphub-tags.sh "$PROJECT" "$GFX"
+
+          ARGS=(--build-arg GPU_ARCH="$GFX")
+          if [ -n "$SCALE_BASE_IMAGE" ]; then
+              ARGS+=(--build-arg SCALE_BASE_IMAGE="$SCALE_BASE_IMAGE")
+          fi
+
+          sudo -E docker build "${ARGS[@]}" --target test -t "$TEST_TAG" \
+              -f "scale-validation/$PROJECT/Dockerfile" scale-validation/
+          sudo -E docker push "$TEST_TAG"
+
+          sudo -E docker build "${ARGS[@]}" -t "$INTERNAL_TAG" \
+              -f "scale-validation/$PROJECT/Dockerfile" scale-validation/
+          sudo -E docker push "$INTERNAL_TAG"
+        env:
+          PROJECT: ${{ matrix.project }}
+          GFX: ${{ matrix.gfx }}
+          SCALE_BASE_IMAGE: ${{ inputs.scale_base_image }}
+
+  test:
+    # Prefixed run- (not test-) so geoff-v2's job_to_program_name/job_to_gfx_name
+    # regexes (which only match ^(run|build)-...) can classify these jobs when
+    # tracking this pipeline via GauntletStatus.
+    name: 'run-${{ matrix.project }}-${{ matrix.gfx }}'
+    runs-on: ${{ matrix.gfx }}
+    needs: build-images
+    # needs: on a matrixed job blocks on *every* leg of that job by default - without
+    # this, one project/gfx failing to build would skip the test job for every other
+    # project/gfx too. Each test instance still fails on its own if its specific image
+    # wasn't pushed (container: pull fails), so this only restores per-combination
+    # independence, it doesn't test a broken image.
+    if: ${{ !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJSON(inputs.projects) }}
+        gfx: ${{ fromJSON(inputs.gfx || vars.SCALE_GPUS_TO_EXTENDED_TEST || vars.SCALE_GPUS_TO_TEST) }}
+    # Runs as a container job (matching every other GPU-labeled runner job in this org's
+    # CI - build-test-deploy.yml's own test job, package.yml's GPU job,
+    # extended-tests.yml's run-thirdparty-test) so GPU passthrough is handled by the
+    # runner/label itself, not hand-rolled --device flags (which would be AMD-only and
+    # give NVIDIA sm_* matrix entries no GPU access at all).
+    container:
+      image: ${{ vars.DOCKER_REGISTRY }}/spectral-compute/${{ matrix.project }}:${{ matrix.gfx }}-test
+    steps:
+      # A container job's own ENTRYPOINT isn't auto-invoked - Actions overrides it to
+      # keep the container alive and runs steps via `docker exec`. GPU_ARCH is already
+      # set as an image env var from the build; this runs the exact command the image's
+      # ENTRYPOINT bakes in per project (see scale-validation/<project>/Dockerfile).
+      - name: Run container test stage
+        run: bash /build/test.sh /build /opt/scale "$GPU_ARCH" "$PROJECT" --match '-(test|benchmark)' --keep
+        env:
+          PROJECT: ${{ matrix.project }}
+
+  deploy:
+    name: 'deploy-${{ matrix.project }}-${{ matrix.gfx }}-${{ matrix.destination }}'
+    runs-on: docker-builder
+    needs: test
+    # needs: test blocks promotion of anything that failed, but that alone is not
+    # sufficient - deploy=true must also be explicitly, separately opted into on this
+    # dispatch. Nightlies always pass deploy=false; there is no ref/tag-based auto-promote.
+    if: ${{ inputs.deploy }}
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJSON(inputs.projects) }}
+        gfx: ${{ fromJSON(inputs.gfx || vars.SCALE_GPUS_TO_EXTENDED_TEST || vars.SCALE_GPUS_TO_TEST) }}
+        destination: ['quay', 'docker']
+    steps:
+      - name: Checkout and setup
+        uses: ${{ forgejo.server_url }}/spectral-compute/ci-helpers/setup@master
+        with:
+          token: '${{ secrets.CI_CLONE_TOKEN }}'
+          private-key: '${{ secrets.CI_BOT_USER_PRIVATE_KEY }}'
+          netrc: '${{ secrets.CI_NETRC }}'
+
+      - name: Install docker CLI
+        run: |
+          set -eo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+          sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+          Types: deb
+          URIs: https://download.docker.com/linux/ubuntu
+          Suites: $(. /etc/os-release && echo "${DEBIAN_CODENAME:-$VERSION_CODENAME}")
+          Components: stable
+          Signed-By: /etc/apt/keyrings/docker.asc
+          EOF
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin
+
+      - name: Clone scale-validation
+        run: git clone -b "$SCALE_VALIDATION_REF" https://github.com/spectral-compute/scale-validation scale-validation
+        env:
+          SCALE_VALIDATION_REF: ${{ inputs.scale_validation_ref }}
+
+      - name: Log in to production registry
+        run: |
+          case "$DESTINATION" in
+            quay)
+              echo '${{ secrets.PRODUCTION_REGISTRY_PASSWORD }}' | sudo -E docker login quay.io -u '${{ secrets.PRODUCTION_REGISTRY_USERNAME }}' --password-stdin
+              ;;
+            docker)
+              echo '${{ secrets.PRODUCTION_REGISTRY2_PASSWORD }}' | sudo -E docker login docker.io -u '${{ secrets.PRODUCTION_REGISTRY2_USERNAME }}' --password-stdin
+              ;;
+          esac
+        env:
+          DESTINATION: ${{ matrix.destination }}
+
+      - name: Retag and push to production registry
+        run: |
+          set -e
+          . scripts/apphub-tags.sh "$PROJECT" "$GFX" "$DESTINATION"
+          sudo -E docker pull "$INTERNAL_TAG"
+          for TAG in $PUBLIC_TAGS; do
+              sudo -E docker tag "$INTERNAL_TAG" "$TAG"
+              sudo -E docker push "$TAG"
+          done
+        env:
+          PROJECT: ${{ matrix.project }}
+          GFX: ${{ matrix.gfx }}
+          DESTINATION: ${{ matrix.destination }}
