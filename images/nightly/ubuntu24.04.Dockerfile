@@ -11,6 +11,11 @@ LABEL maintainer="Spectral Compute <hello@spectralcompute.co.uk>"
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y wget git clang gcc make pkg-config cmake libelf-dev
 
+# Source for rocm-scale, a dependency of scale-nightly.deb.
+RUN wget https://pkgs.scale-lang.com/deb/dists/noble/main/binary-all/scale-repos.deb && \
+    apt-get install -y ./scale-repos.deb && \
+    apt-get update
+
 COPY nightly-deb/scale-nightly.deb /tmp/scale-nightly.deb
 RUN SCALE_LICENSE_ACCEPT=1 apt-get install --no-install-recommends -y /tmp/scale-nightly.deb && \
     rm /tmp/scale-nightly.deb
