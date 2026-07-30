@@ -13,9 +13,9 @@ on:
             "whispercpp"
           ]
       gfx:
-        description: 'Override the GPUs to build/test on (JSON array). Defaults to the same var extended-tests.yml uses.'
+        description: 'Override the GPUs to build/test on (JSON array). Defaults to vars.SCALE_GPUS_TO_DOCKER_TEST, falling back to vars.SCALE_GPUS_TO_TEST.'
         required: false
-        # default: '${{ vars.SCALE_GPUS_TO_EXTENDED_TEST || vars.SCALE_GPUS_TO_TEST }}'
+        # default: '${{ vars.SCALE_GPUS_TO_DOCKER_TEST || vars.SCALE_GPUS_TO_TEST }}'
         type: 'string'
       deploy:
         description: >-
@@ -50,7 +50,7 @@ jobs:
       fail-fast: false
       matrix:
         project: ${{ fromJSON(inputs.projects) }}
-        gfx: ${{ fromJSON(inputs.gfx || vars.SCALE_GPUS_TO_EXTENDED_TEST || vars.SCALE_GPUS_TO_TEST) }}
+        gfx: ${{ fromJSON(inputs.gfx || vars.SCALE_GPUS_TO_DOCKER_TEST || vars.SCALE_GPUS_TO_TEST) }}
     steps:
       - name: Checkout and setup
         uses: ${{ forgejo.server_url }}/spectral-compute/ci-helpers/setup@master
@@ -122,7 +122,7 @@ jobs:
       fail-fast: false
       matrix:
         project: ${{ fromJSON(inputs.projects) }}
-        gfx: ${{ fromJSON(inputs.gfx || vars.SCALE_GPUS_TO_EXTENDED_TEST || vars.SCALE_GPUS_TO_TEST) }}
+        gfx: ${{ fromJSON(inputs.gfx || vars.SCALE_GPUS_TO_DOCKER_TEST || vars.SCALE_GPUS_TO_TEST) }}
     # Runs as a container job (matching every other GPU-labeled runner job in this org's
     # CI - build-test-deploy.yml's own test job, package.yml's GPU job,
     # extended-tests.yml's run-thirdparty-test) so GPU passthrough is handled by the
@@ -152,7 +152,7 @@ jobs:
       fail-fast: false
       matrix:
         project: ${{ fromJSON(inputs.projects) }}
-        gfx: ${{ fromJSON(inputs.gfx || vars.SCALE_GPUS_TO_EXTENDED_TEST || vars.SCALE_GPUS_TO_TEST) }}
+        gfx: ${{ fromJSON(inputs.gfx || vars.SCALE_GPUS_TO_DOCKER_TEST || vars.SCALE_GPUS_TO_TEST) }}
         destination: ['quay', 'docker']
     steps:
       - name: Checkout and setup
