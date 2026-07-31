@@ -86,24 +86,28 @@ jobs:
       - name: Build and push images
         run: |
           set -e
-          . scripts/apphub-tags.sh "$PROJECT" "$GFX"
+          . scripts/apphub-tags.sh "$PROJECT" "$GFX" "$RUN_NUMBER"
 
           ARGS=(--build-arg GPU_ARCH="$GFX")
           if [ -n "$SCALE_BASE_IMAGE" ]; then
               ARGS+=(--build-arg SCALE_BASE_IMAGE="$SCALE_BASE_IMAGE")
           fi
 
-          sudo -E docker build "${ARGS[@]}" --target test -t "$TEST_TAG" \
+          # -t twice: same build, so a failed build pushes neither tag.
+          sudo -E docker build "${ARGS[@]}" --target test -t "$TEST_TAG" -t "$RUN_TEST_TAG" \
               -f "scale-validation/$PROJECT/Dockerfile" scale-validation/
           sudo -E docker push "$TEST_TAG"
+          sudo -E docker push "$RUN_TEST_TAG"
 
-          sudo -E docker build "${ARGS[@]}" -t "$INTERNAL_TAG" \
+          sudo -E docker build "${ARGS[@]}" -t "$INTERNAL_TAG" -t "$RUN_INTERNAL_TAG" \
               -f "scale-validation/$PROJECT/Dockerfile" scale-validation/
           sudo -E docker push "$INTERNAL_TAG"
+          sudo -E docker push "$RUN_INTERNAL_TAG"
         env:
           PROJECT: ${{ matrix.project }}
           GFX: ${{ matrix.gfx }}
           SCALE_BASE_IMAGE: ${{ inputs.scale_base_image }}
+          RUN_NUMBER: ${{ forgejo.run_number }}
 
   test:
     # Prefixed run- (not test-) so geoff-v2's job_to_program_name/job_to_gfx_name
@@ -115,8 +119,7 @@ jobs:
     # needs: on a matrixed job blocks on *every* leg of that job by default - without
     # this, one project/gfx failing to build would skip the test job for every other
     # project/gfx too. Each test instance still fails on its own if its specific image
-    # wasn't pushed (container: pull fails), so this only restores per-combination
-    # independence, it doesn't test a broken image.
+    # wasn't pushed (container: pull fails; see the run-scoped tag below).
     if: ${{ !cancelled() }}
     strategy:
       fail-fast: false
@@ -129,7 +132,9 @@ jobs:
     # runner/label itself, not hand-rolled --device flags (which would be AMD-only and
     # give NVIDIA sm_* matrix entries no GPU access at all).
     container:
-      image: ${{ vars.DOCKER_REGISTRY }}/spectral-compute/${{ matrix.project }}:${{ matrix.gfx }}-test
+      # Run-scoped tag: build-images only pushes it on a fresh success, so a failed
+      # build fails this pull instead of resolving to a stale image.
+      image: ${{ vars.DOCKER_REGISTRY }}/spectral-compute/${{ matrix.project }}:${{ matrix.gfx }}-test-run${{ forgejo.run_number }}
     steps:
       # A container job's own ENTRYPOINT isn't auto-invoked - Actions overrides it to
       # keep the container alive and runs steps via `docker exec`. GPU_ARCH is already
@@ -202,13 +207,16 @@ jobs:
       - name: Retag and push to production registry
         run: |
           set -e
-          . scripts/apphub-tags.sh "$PROJECT" "$GFX" "$DESTINATION"
-          sudo -E docker pull "$INTERNAL_TAG"
+          . scripts/apphub-tags.sh "$PROJECT" "$GFX" "$RUN_NUMBER" "$DESTINATION"
+          # Run-scoped tag: needs: test can't catch a vacuous test pass, but this pull
+          # fails outright if this run's build never pushed it.
+          sudo -E docker pull "$RUN_INTERNAL_TAG"
           for TAG in $PUBLIC_TAGS; do
-              sudo -E docker tag "$INTERNAL_TAG" "$TAG"
+              sudo -E docker tag "$RUN_INTERNAL_TAG" "$TAG"
               sudo -E docker push "$TAG"
           done
         env:
           PROJECT: ${{ matrix.project }}
           GFX: ${{ matrix.gfx }}
           DESTINATION: ${{ matrix.destination }}
+          RUN_NUMBER: ${{ forgejo.run_number }}
