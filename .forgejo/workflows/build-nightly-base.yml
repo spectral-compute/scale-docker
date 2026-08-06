@@ -25,6 +25,8 @@ jobs:
       fail-fast: false
       matrix:
         distro: ${{ fromJSON(inputs.distros) }}
+    container:
+      image: ${{ vars.DOCKER_REGISTRY }}/spectral/docker-ubuntu24.04:latest
     steps:
       - name: Checkout and setup
         uses: ${{ forgejo.server_url }}/spectral-compute/ci-helpers/setup@master
@@ -33,25 +35,6 @@ jobs:
           private-key: '${{ secrets.CI_BOT_USER_PRIVATE_KEY }}'
           netrc: '${{ secrets.CI_NETRC }}'
           submodules: 'ci/common'
-
-      - name: Install docker CLI
-        run: |
-          set -eo pipefail
-          sudo apt-get update
-          sudo apt-get install -y ca-certificates curl
-          sudo install -m 0755 -d /etc/apt/keyrings
-          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-          sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-          sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
-          Types: deb
-          URIs: https://download.docker.com/linux/ubuntu
-          Suites: $(. /etc/os-release && echo "${DEBIAN_CODENAME:-$VERSION_CODENAME}")
-          Components: stable
-          Signed-By: /etc/apt/keyrings/docker.asc
-          EOF
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin
 
       - name: Download nightly package
         # Called by relative path, not bare `artefacts`: this job has no

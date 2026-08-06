@@ -51,6 +51,8 @@ jobs:
       matrix:
         project: ${{ fromJSON(inputs.projects) }}
         gfx: ${{ fromJSON(inputs.gfx || vars.SCALE_GPUS_TO_DOCKER_TEST || vars.SCALE_GPUS_TO_TEST) }}
+    container:
+      image: ${{ vars.DOCKER_REGISTRY }}/spectral/docker-ubuntu24.04:latest
     steps:
       - name: Checkout and setup
         uses: ${{ forgejo.server_url }}/spectral-compute/ci-helpers/setup@master
@@ -58,25 +60,6 @@ jobs:
           token: '${{ secrets.CI_CLONE_TOKEN }}'
           private-key: '${{ secrets.CI_BOT_USER_PRIVATE_KEY }}'
           netrc: '${{ secrets.CI_NETRC }}'
-
-      - name: Install docker CLI
-        run: |
-          set -eo pipefail
-          sudo apt-get update
-          sudo apt-get install -y ca-certificates curl
-          sudo install -m 0755 -d /etc/apt/keyrings
-          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-          sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-          sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
-          Types: deb
-          URIs: https://download.docker.com/linux/ubuntu
-          Suites: $(. /etc/os-release && echo "${DEBIAN_CODENAME:-$VERSION_CODENAME}")
-          Components: stable
-          Signed-By: /etc/apt/keyrings/docker.asc
-          EOF
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin
 
       - name: Clone scale-validation
         run: git clone -b "$SCALE_VALIDATION_REF" https://github.com/spectral-compute/scale-validation scale-validation
@@ -159,6 +142,8 @@ jobs:
         project: ${{ fromJSON(inputs.projects) }}
         gfx: ${{ fromJSON(inputs.gfx || vars.SCALE_GPUS_TO_DOCKER_TEST || vars.SCALE_GPUS_TO_TEST) }}
         destination: ['quay', 'docker']
+    container:
+      image: ${{ vars.DOCKER_REGISTRY }}/spectral/docker-ubuntu24.04:latest
     steps:
       - name: Checkout and setup
         uses: ${{ forgejo.server_url }}/spectral-compute/ci-helpers/setup@master
@@ -166,25 +151,6 @@ jobs:
           token: '${{ secrets.CI_CLONE_TOKEN }}'
           private-key: '${{ secrets.CI_BOT_USER_PRIVATE_KEY }}'
           netrc: '${{ secrets.CI_NETRC }}'
-
-      - name: Install docker CLI
-        run: |
-          set -eo pipefail
-          sudo apt-get update
-          sudo apt-get install -y ca-certificates curl
-          sudo install -m 0755 -d /etc/apt/keyrings
-          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-          sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-          sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
-          Types: deb
-          URIs: https://download.docker.com/linux/ubuntu
-          Suites: $(. /etc/os-release && echo "${DEBIAN_CODENAME:-$VERSION_CODENAME}")
-          Components: stable
-          Signed-By: /etc/apt/keyrings/docker.asc
-          EOF
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin
 
       - name: Clone scale-validation
         run: git clone -b "$SCALE_VALIDATION_REF" https://github.com/spectral-compute/scale-validation scale-validation
