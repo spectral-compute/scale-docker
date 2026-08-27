@@ -10,7 +10,13 @@ on:
             "cycles",
             "hashcat",
             "nvflip",
-            "whispercpp"
+            "whispercpp",
+            "alien",
+            "cuSZ",
+            "FastEddy",
+            "GPUJPEG",
+            "llama.cpp",
+            "RabbitCT"
           ]
       gfx:
         description: 'Override the GPUs to build/test on (JSON array). Defaults to vars.SCALE_GPUS_TO_DOCKER_TEST, falling back to vars.SCALE_GPUS_TO_TEST.'
@@ -18,14 +24,7 @@ on:
         # default: '${{ vars.SCALE_GPUS_TO_DOCKER_TEST || vars.SCALE_GPUS_TO_TEST }}'
         type: 'string'
       deploy:
-        description: >-
-          Push tested images to the public registries (quay.io/docker.io). This is the
-          only thing that gates a public push - passing tests alone are not enough (see
-          `needs: test` on the deploy job below). Nightly dispatches must always pass
-          deploy=false and stay internal-only; promoting to public is a deliberate,
-          separate dispatch with deploy=true, mirroring how package releases are
-          published today (a manual, GPG-signed step - see package/HOWTO.md upstream -
-          not an automatic trigger on any git ref/tag).
+        description: 'Push tested images to the public registries (quay.io/docker.io).'
         default: false
         type: 'boolean'
       scale_base_image:
