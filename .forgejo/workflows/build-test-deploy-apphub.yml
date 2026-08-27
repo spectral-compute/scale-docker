@@ -128,14 +128,35 @@ jobs:
         env:
           PROJECT: ${{ matrix.project }}
 
+      # needs: test (below) can only see this whole matrixed job's aggregate result, not
+      # which specific project/gfx leg passed - one leg failing would otherwise skip
+      # *every* deploy leg, including ones whose own test passed. This step only runs if
+      # the test step above succeeded (default step behaviour, no `if:` override needed),
+      # and records that fact per-leg via a commit status deploy can check individually.
+      - name: Record this leg's test result
+        run: |
+          curl -sf -X POST \
+            -H "Authorization: token ${FJ_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"state\":\"success\",\"context\":\"apphub-test/${PROJECT}-${GFX}\",\"description\":\"container test stage passed\"}" \
+            "${{ forgejo.server_url }}/api/v1/repos/${{ forgejo.repository }}/statuses/${{ forgejo.sha }}"
+        env:
+          PROJECT: ${{ matrix.project }}
+          GFX: ${{ matrix.gfx }}
+          FJ_TOKEN: ${{ secrets.CI_CLONE_TOKEN }}
+
   deploy:
     name: 'deploy-${{ matrix.project }}-${{ matrix.gfx }}-${{ matrix.destination }}'
     runs-on: docker-builder
     needs: test
-    # needs: test blocks promotion of anything that failed, but that alone is not
-    # sufficient - deploy=true must also be explicitly, separately opted into on this
-    # dispatch. Nightlies always pass deploy=false; there is no ref/tag-based auto-promote.
-    if: ${{ inputs.deploy }}
+    # needs: test still schedules deploy after every test leg finishes, but its default
+    # implicit success() check would skip *all* deploy legs if *any* single test leg
+    # failed - !cancelled() bypasses that (matching test's own override relative to
+    # build-images above); the "Verify this leg's test actually passed" step below is
+    # the real per-leg gate, via the commit status the matching test leg recorded.
+    # deploy=true must also be explicitly, separately opted into on this dispatch.
+    # Nightlies always pass deploy=false; there is no ref/tag-based auto-promote.
+    if: ${{ inputs.deploy && !cancelled() }}
     strategy:
       fail-fast: false
       matrix:
@@ -145,6 +166,42 @@ jobs:
     container:
       image: ${{ vars.DOCKER_REGISTRY }}/spectral/docker-ubuntu24.04:latest
     steps:
+      - name: Verify this leg's test actually passed
+        # needs: test only guarantees the *whole* test job finished, not that this
+        # specific project/gfx leg succeeded - check the commit status that leg recorded
+        # itself, so a failure elsewhere in the matrix can't silently skip a good deploy,
+        # and a failure in *this* leg can't slip through on the strength of others.
+        #
+        # UNVERIFIED (authored without live Forgejo API access - confirm before relying
+        # on this for a real deploy):
+        # - `.status` on the read side, vs `.state` used in the write side's POST body,
+        #   may be intentional (Gitea/Forgejo's CommitStatus read struct is believed to
+        #   serialize this field as `status` even though CreateStatusOption's write
+        #   field is `state`) rather than a mismatch - but this wasn't confirmed against
+        #   a live instance. If wrong, this fails closed (STATUS reads empty, deploy is
+        #   blocked) rather than letting anything untested through.
+        # - CI_CLONE_TOKEN's scope for the commit-status API (read+write) is unconfirmed
+        #   - it's only proven elsewhere in this file for git clone auth. If a built-in
+        #   per-run token is available on this Forgejo instance (e.g. secrets.GITHUB_TOKEN),
+        #   that would be a more idiomatic, likely-correctly-scoped choice - no workflow
+        #   in this repo currently uses one, so availability is unverified either way.
+        run: |
+          set -e
+          sudo apt-get update -qq && sudo apt-get install -y -qq jq
+          CONTEXT="apphub-test/${PROJECT}-${GFX}"
+          STATUS="$(curl -sf -H "Authorization: token ${FJ_TOKEN}" \
+            "${{ forgejo.server_url }}/api/v1/repos/${{ forgejo.repository }}/commits/${{ forgejo.sha }}/status" \
+            | jq -r --arg ctx "$CONTEXT" '.statuses[]? | select(.context == $ctx) | .status' | head -1)"
+          echo "test status for ${PROJECT}/${GFX}: ${STATUS:-missing}"
+          if [ "${STATUS}" != "success" ]; then
+            echo "::error::${PROJECT}/${GFX}'s own test leg did not pass (status=${STATUS:-missing}) - refusing to deploy this image, even though other legs in this run may have succeeded."
+            exit 1
+          fi
+        env:
+          PROJECT: ${{ matrix.project }}
+          GFX: ${{ matrix.gfx }}
+          FJ_TOKEN: ${{ secrets.CI_CLONE_TOKEN }}
+
       - name: Checkout and setup
         uses: ${{ forgejo.server_url }}/spectral-compute/ci-helpers/setup@master
         with:
