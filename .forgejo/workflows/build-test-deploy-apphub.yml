@@ -12,11 +12,11 @@ on:
             "nvflip",
             "whispercpp",
             "alien",
-            "cuSZ",
-            "FastEddy",
-            "GPUJPEG",
+            "cusz",
+            "fasteddy",
+            "gpujpeg",
             "llama.cpp",
-            "RabbitCT"
+            "rabbitct"
           ]
       gfx:
         description: 'Override the GPUs to build/test on (JSON array). Defaults to vars.SCALE_GPUS_TO_DOCKER_TEST, falling back to vars.SCALE_GPUS_TO_TEST.'
