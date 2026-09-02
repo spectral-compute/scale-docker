@@ -1,8 +1,5 @@
-name: Bug Report
-about: Report a problem or unexpected behaviour
-title: "[Bug]: "
-labels:
-  - Bug
+name: New Issue
+about: Report a problem, missing feature, or unexpected behaviour
 body:
   - type: textarea
     id: details-of-issue
@@ -15,7 +12,7 @@ body:
   - type: textarea
     id: environment
     attributes:
-      label: "Environment (Machine, `git` hashes, etc.)"
+      label: "Environment"
       description: Git commit or tag used, environment variables, software dependency versions, machine name, etc.
     validations:
       required: true
@@ -48,6 +45,6 @@ body:
     id: steps-taken-to-fix
     attributes:
       label: Steps Taken to Fix (if any)
-      description: Any troubleshooting or fixes you've already tried.
+      description: Any troubleshooting or fixes you've already tried (Optional).
     validations:
       required: false
