@@ -98,11 +98,9 @@ jobs:
     name: 'run-${{ matrix.project }}-${{ matrix.gfx }}'
     runs-on: ${{ matrix.gfx }}
     needs: build-images
-    # needs: on a matrixed job blocks on *every* leg of that job by default - without
-    # this, one project/gfx failing to build would skip the test job for every other
-    # project/gfx too. Each test instance still fails on its own if its specific image
-    # wasn't pushed (container: pull fails; see the run-scoped tag below).
-    if: ${{ !cancelled() }}
+    # Run even if a build-images leg failed/was cancelled; each test instance still
+    # fails on its own if its image wasn't pushed.
+    if: ${{ always() }}
     strategy:
       fail-fast: false
       matrix:
@@ -148,14 +146,9 @@ jobs:
     name: 'deploy-${{ matrix.project }}-${{ matrix.gfx }}-${{ matrix.destination }}'
     runs-on: docker-builder
     needs: test
-    # needs: test still schedules deploy after every test leg finishes, but its default
-    # implicit success() check would skip *all* deploy legs if *any* single test leg
-    # failed - !cancelled() bypasses that (matching test's own override relative to
-    # build-images above); the "Verify this leg's test actually passed" step below is
-    # the real per-leg gate, via the commit status the matching test leg recorded.
-    # deploy=true must also be explicitly, separately opted into on this dispatch.
-    # Nightlies always pass deploy=false; there is no ref/tag-based auto-promote.
-    if: ${{ inputs.deploy && !cancelled() }}
+    # Run even if a test leg failed/was cancelled; "Verify this leg's test actually
+    # passed" below is the real per-leg gate.
+    if: ${{ inputs.deploy }}
     strategy:
       fail-fast: false
       matrix:
