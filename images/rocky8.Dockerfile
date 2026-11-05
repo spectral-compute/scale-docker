@@ -7,7 +7,7 @@ RUN dnf install -y git which patch gcc clang elfutils-libelf-devel
 RUN dnf install -y https://pkgs.scale-lang.com/rpm/el8/main/scale-repos.rpm
 
 ARG SCALE_VERSION
-RUN SCALE_LICENSE_ACCEPT=1 dnf install -y scale-$SCALE_VERSION
+RUN SCALE_LICENSE_ACCEPT=1 dnf install --setopt=install_weak_deps=False -y scale-$SCALE_VERSION
 
 ARG CUDA_VERSION
 ENV SCALE_CUDA_VERSION=$CUDA_VERSION
