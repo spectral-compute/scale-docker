@@ -55,7 +55,7 @@ jobs:
       matrix:
         target: ['devel']
         test: ['hashcat']
-        distro: ['ubuntu22.04', 'ubuntu24.04', 'rocky9']
+        distro: ['ubuntu22.04', 'ubuntu24.04', 'rocky8', 'rocky9']
     container:
       image: ${{ vars.DOCKER_REGISTRY }}/spectral-compute/scale-lang:13.0.2-${{ matrix.target }}-${{ matrix.distro }}
       env:

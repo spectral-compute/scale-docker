@@ -19,6 +19,7 @@ Tags are in the format `$CUDA_VERSION-$TARGET-$DISTRO[-$SCALE_VERSION]`, where:
     - `ubuntu22.04`, based off of `docker.io/ubuntu:22.04`
     - `ubuntu24.04`, based off of `docker.io/ubuntu:24.04`
     - `rocky9`, based off of `docker.io/rockylinux/rockylinux:9`
+    - `rocky8`, based off of `docker.io/rockylinux/rockylinux:8`
   - Cuda version is one of:
     - `13.0.2`
     - `12.1.0`
